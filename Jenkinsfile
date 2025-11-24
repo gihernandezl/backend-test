@@ -66,3 +66,27 @@ pipeline {
                     docker push ghcr.io/${DOCKERHUB_USER}/${DOCKER_IMAGE}:latest
                     docker push ghcr.io/${DOCKERHUB_USER}/${DOCKER_IMAGE}:${BUILD_NUMBER}
                     """
+                }
+            }
+        }
+        */
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh """
+                kubectl set image deployment/backend-test backend-test=${DOCKERHUB_USER}/${DOCKER_IMAGE}:${BUILD_NUMBER} \
+                    -n gihernandez --kubeconfig=${KUBECONFIG_PATH}
+                """
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Despliegue exitoso. Imagen: ${DOCKERHUB_USER}/${DOCKER_IMAGE}:${BUILD_NUMBER}"
+        }
+        failure {
+            echo " Falló el pipeline maldición freezer"
+        }
+    }
+}
