@@ -1,10 +1,6 @@
 pipeline {
-    agent {
-        docker {
-            image 'node:18'
-            args '-u root:root'
-        }
-    }
+    //agent any por error con plugin dwe docker
+    agent any
 
     environment {
         DOCKERHUB_REPO = "gihernandezl/backend-test"
@@ -13,7 +9,7 @@ pipeline {
     }
 
     stages {
-        
+
         stage('Checkout') {
             steps {
                 git branch: 'main', url: 'https://github.com/gihernandezl/backend-test.git'
