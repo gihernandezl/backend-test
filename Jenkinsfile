@@ -1,6 +1,11 @@
 pipeline {
-    agent any
-//config environment path
+    agent {
+        docker {
+            image 'node:18'
+            args '-u root:root'
+        }
+    }
+
     environment {
         DOCKERHUB_REPO = "gihernandezl/backend-test"
         GH_REPO = "docker.pkg.github.com/gihernandezl/backend-test/backend-test"
@@ -23,16 +28,16 @@ pipeline {
 
         stage('Testing') {
             steps {
-                sh 'npm test || true'    
+                sh 'npm test || true'
             }
         }
 
         stage('Build') {
             steps {
-                sh 'npm run build || echo "No build step"'
+                sh 'npm run build || echo "No build script"'
             }
         }
-//Docker image build
+
         stage('Docker Build Image') {
             steps {
                 sh """
