@@ -2,17 +2,17 @@ pipeline {
     agent any
 
     environment {
-        DOCKERHUB_USER = 'gihernandezl'
-        IMAGE = "${DOCKERHUB_USER}/backend-test"
-        IMAGE_TAG = "${BUILD_NUMBER}"
-        KUBECONFIG = "/var/jenkins_home/kubeconfig"
+        DOCKERHUB_USER = "gihernandezl"
+        DOCKER_IMAGE = "backend-test"
+        KUBECONFIG_PATH = "/var/jenkins_home/kubeconfig"
     }
 
     stages {
 
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/gihernandezl/backend-test.git'
+                git branch: 'main',
+                    url: 'https://github.com/gihernandezl/backend-test.git'
             }
         }
 
@@ -37,37 +37,45 @@ pipeline {
         stage('Docker Build Image') {
             steps {
                 sh """
-                    docker build -t ${IMAGE}:latest .
-                    docker tag ${IMAGE}:latest ${IMAGE}:${IMAGE_TAG}
+                docker build -t ${DOCKERHUB_USER}/${DOCKER_IMAGE}:latest .
+                docker tag ${DOCKERHUB_USER}/${DOCKER_IMAGE}:latest ${DOCKERHUB_USER}/${DOCKER_IMAGE}:${BUILD_NUMBER}
                 """
             }
         }
 
         stage('DockerHub Push') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                withCredentials([string(credentialsId: 'dockerhub-pass', variable: 'PASS')]) {
                     sh """
-                        echo "$PASS" | docker login -u "$USER" --password-stdin
-                        docker push ${IMAGE}:latest
-                        docker push ${IMAGE}:${IMAGE_TAG}
+                    echo "$PASS" | docker login -u ${DOCKERHUB_USER} --password-stdin
+                    docker push ${DOCKERHUB_USER}/${DOCKER_IMAGE}:latest
+                    docker push ${DOCKERHUB_USER}/${DOCKER_IMAGE}:${BUILD_NUMBER}
                     """
                 }
             }
         }
 
+        /*
+        stage('Push to GitHub Packages') {
+            steps {
+                withCredentials([string(credentialsId: 'github-token', variable: 'GH_TOKEN')]) {
+                    sh """
+                    echo "$GH_TOKEN" | docker login docker.pkg.github.com -u ${DOCKERHUB_USER} --password-stdin
+                    docker tag ${DOCKERHUB_USER}/${DOCKER_IMAGE}:latest docker.pkg.github.com/${DOCKERHUB_USER}/${DOCKER_IMAGE}/${DOCKER_IMAGE}:latest
+                    docker tag ${DOCKERHUB_USER}/${DOCKER_IMAGE}:latest docker.pkg.github.com/${DOCKERHUB_USER}/${DOCKER_IMAGE}/${DOCKER_IMAGE}:${BUILD_NUMBER}
+                    docker push docker.pkg.github.com/${DOCKERHUB_USER}/${DOCKER_IMAGE}/${DOCKER_IMAGE}:latest
+                    docker push docker.pkg.github.com/${DOCKERHUB_USER}/${DOCKER_IMAGE}/${DOCKER_IMAGE}:${BUILD_NUMBER}
+                    """
+                }
+            }
+        }
+        */
+
         stage('Deploy to Kubernetes') {
             steps {
                 sh """
-                    echo "➡ Usando KUBECONFIG en ${KUBECONFIG}"
-
-                    kubectl --kubeconfig=${KUBECONFIG} set image \
-                        deployment/backend-test backend-test=${IMAGE}:${IMAGE_TAG} \
-                        -n gihernandez
-
-                    echo "➡ Esperando rollout…"
-
-                    kubectl --kubeconfig=${KUBECONFIG} rollout status \
-                        deployment/backend-test -n gihernandez
+                kubectl set image deployment/backend-test backend-test=${DOCKERHUB_USER}/${DOCKER_IMAGE}:${BUILD_NUMBER} \
+                    -n gihernandez --kubeconfig=${KUBECONFIG_PATH}
                 """
             }
         }
@@ -75,10 +83,10 @@ pipeline {
 
     post {
         success {
-            echo " Deployment completo: ${IMAGE}:${IMAGE_TAG}"
+            echo "🎉 Despliegue exitoso. Imagen: ${DOCKERHUB_USER}/${DOCKER_IMAGE}:${BUILD_NUMBER}"
         }
         failure {
-            echo " Pipeline falló. Revisar logs arriba."
+            echo "❌ Falló el pipeline"
         }
     }
 }
